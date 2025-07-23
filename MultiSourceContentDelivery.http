@@ -1,0 +1,6 @@
+@MultiSourceContentDelivery_HostAddress = http://localhost:5010
+
+GET {{MultiSourceContentDelivery_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

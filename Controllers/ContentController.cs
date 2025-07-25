@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using MultiSourceContentDelivery.DbContexts;
 using MultiSourceContentDelivery.Models;
 using MultiSourceContentDelivery.Services;
 
@@ -10,26 +12,36 @@ public class ContentController : ControllerBase
 {
     private readonly ILogger<ContentController> _logger;
     private readonly FileStorageService _fileStorage;
-    private readonly NodeCommunicationService _nodeCommunication;
+    private readonly FileInfoContext _context;
     private readonly NodeConfig _config;
 
     public ContentController(
         ILogger<ContentController> logger,
         FileStorageService fileStorage,
-        NodeCommunicationService nodeCommunication,
+        FileInfoContext context,
         NodeConfig config)
     {
         _logger = logger;
         _fileStorage = fileStorage;
-        _nodeCommunication = nodeCommunication;
+        _context = context;
         _config = config;
     }
 
     [HttpGet("{hash}")]
     public async Task<IActionResult> GetFile(string hash)
     {
-        if (_fileStorage.GetCurrentLoad() < _config.MaxLoadPercentage)
+        var fileInfo = await _context.FileInfos.FirstOrDefaultAsync(f => f.Hash == hash);
+        if (fileInfo == null)
         {
+            return NotFound();
+        }
+
+        // 如果文件在本地且负载未超过阈值，直接提供服务
+        if (!string.IsNullOrEmpty(fileInfo.LocalPath) && await _fileStorage.GetCurrentLoadAsync() < _config.MaxLoadPercentage)
+        {
+            fileInfo.AccessCount++;
+            await _context.SaveChangesAsync();
+
             var fileResult = await _fileStorage.GetFileAsync(hash);
             if (fileResult.HasValue)
             {
@@ -41,13 +53,20 @@ public class ContentController : ControllerBase
             }
         }
 
-        var nodeWithFile = await _nodeCommunication.QueryFileExistenceAsync(hash);
-        if (nodeWithFile != null)
+        // 选择负载最低的可用节点进行重定向
+        var availableNodes = fileInfo.AvailableNodes
+            .Select(url => _context.Nodes.FirstOrDefault(n => n.Url == url))
+            .Where(n => n != null && n.IsActive && n.CurrentLoad < _config.MaxLoadPercentage)
+            .OrderBy(n => n.CurrentLoad)
+            .ToList();
+
+        if (availableNodes.Any())
         {
-            return Redirect($"https://{nodeWithFile.FirstOrDefault()}/content/{hash}");
+            var targetNode = availableNodes.First();
+            return Redirect($"{targetNode.Url}/content/{hash}");
         }
 
-        return NotFound();
+        return NotFound("No available nodes to serve the content");
     }
 
 }

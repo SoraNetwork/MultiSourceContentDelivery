@@ -1,0 +1,48 @@
+{
+    "version": 1,
+    "name": "系统测试",
+    "variables": {
+        "baseUrl": "http://localhost:5000"
+    },
+    "requests": [
+        {
+            "id": "get-node-status",
+            "name": "获取节点状态",
+            "method": "GET",
+            "url": "{{baseUrl}}/api/status"
+        },
+        {
+            "id": "get-node-status-history",
+            "name": "获取节点状态历史",
+            "method": "GET",
+            "url": "{{baseUrl}}/api/status/history"
+        },
+        {
+            "id": "upload-test-file",
+            "name": "上传测试文件",
+            "method": "POST",
+            "url": "{{baseUrl}}/api/test/upload",
+            "headers": {
+                "Content-Type": "application/json"
+            }
+        },
+        {
+            "id": "get-storage-info",
+            "name": "获取存储信息",
+            "method": "GET",
+            "url": "{{baseUrl}}/api/test/storage-info"
+        },
+        {
+            "id": "get-all-files",
+            "name": "获取所有文件",
+            "method": "GET",
+            "url": "{{baseUrl}}/api/test/files"
+        },
+        {
+            "id": "get-node-info",
+            "name": "获取节点信息",
+            "method": "GET",
+            "url": "{{baseUrl}}/api/node/info"
+        }
+    ]
+}

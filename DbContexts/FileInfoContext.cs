@@ -10,4 +10,5 @@ public class FileInfoContext : DbContext
    }
 
     public DbSet<Models.FileInfo> FileInfos { get; set; } = null!;
+    public DbSet<Models.NodeInfo> Nodes { get; set; } = null!;
 }

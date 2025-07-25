@@ -17,5 +17,7 @@ public class NodeConfig
 
     public TimeSpan FileTransferDelay { get; set; } = TimeSpan.FromMinutes(5);
 
-    public int UdpPort { get; set; } = 9876;
+    public TimeSpan DirectoryScanInterval { get; set; } = TimeSpan.FromMinutes(10);
+
+    public string StorageDirectory { get; set; } = "Storage";
 }

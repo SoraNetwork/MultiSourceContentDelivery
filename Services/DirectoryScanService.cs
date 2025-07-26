@@ -230,9 +230,12 @@ public class DirectoryScanService : BackgroundService
             await context.SaveChangesAsync(stoppingToken);
 
             // 同步其他节点的文件信息
-            var activeNodes = await context.Nodes
-                .Where(n => n.IsActive && n.Url != nodeInfo.Url)
+            // 先获取所有节点，然后在内存中过滤活跃节点
+            var allNodes = await context.Nodes
+                .Where(n => n.Url != nodeInfo.Url)
                 .ToListAsync(stoppingToken);
+
+            var activeNodes = allNodes.Where(n => n.IsActive).ToList();
 
             foreach (var node in activeNodes)
             {

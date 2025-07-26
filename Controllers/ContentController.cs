@@ -74,10 +74,16 @@ public class ContentController : ControllerBase
                 return StatusCode(500, "Invalid node configuration");
             }
 
-            // 使用配置的主域名，使用 HTTPS，忽略原始端口
-            var redirectUrl = $"https://{uri.Host}.{_config.MainDomain}/content/{hash}";
-            _logger.LogInformation("Redirecting request to: {RedirectUrl}", redirectUrl);
-            return Redirect(redirectUrl);
+            // 使用主域名，通过 Location 头里的 Host 让 DNS 解析到目标节点
+            var redirectUrl = $"https://{_config.MainDomain}/content/{hash}";
+            
+            // RFC 7231 允许我们在重定向时指定 Host 头
+            Response.Headers["Location"] = redirectUrl;
+            Response.Headers["Connection"] = "close"; // 确保客户端重新建立连接
+            Response.Headers["Host"] = uri.Host; // 通知 DNS 解析到这个 IP
+            
+            _logger.LogInformation("Redirecting to node {NodeIp} via {Domain}", uri.Host, _config.MainDomain);
+            return StatusCode(302);
         }
 
         return NotFound("No available nodes to serve the content");

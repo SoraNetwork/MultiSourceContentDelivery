@@ -75,6 +75,6 @@ jobs:
       uses: appleboy/ssh-action@v1
       with: 
         host: ${{ secrets[format('{0}_SERVER', matrix.location)] }}
-        password: ${{ secrets[format('{0}_USERNAME', matrix.location)] }}
-        key: ${{ secrets[format('{0}_KEY', matrix.location)] }}
+        username: ${{ secrets[format('{0}_USERNAME', matrix.location)] }}
+        password: ${{ secrets[format('{0}_KEY', matrix.location)] }}
         script: sudo supervisorctl start mcdn-service

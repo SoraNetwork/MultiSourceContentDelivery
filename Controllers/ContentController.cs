@@ -63,7 +63,21 @@ public class ContentController : ControllerBase
         if (availableNodes.Any())
         {
             var targetNode = availableNodes.First();
-            return Redirect($"{targetNode.Url}/content/{hash}");
+            if (targetNode?.Url == null)
+            {
+                return StatusCode(500, "Invalid node configuration");
+            }
+
+            if (!Uri.TryCreate(targetNode.Url, UriKind.Absolute, out var uri))
+            {
+                _logger.LogError("Invalid node URL format: {Url}", targetNode.Url);
+                return StatusCode(500, "Invalid node configuration");
+            }
+
+            // 使用配置的主域名，使用 HTTPS，忽略原始端口
+            var redirectUrl = $"https://{uri.Host}.{_config.MainDomain}/content/{hash}";
+            _logger.LogInformation("Redirecting request to: {RedirectUrl}", redirectUrl);
+            return Redirect(redirectUrl);
         }
 
         return NotFound("No available nodes to serve the content");

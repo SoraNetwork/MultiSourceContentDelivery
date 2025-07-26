@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using MultiSourceContentDelivery.DbContexts;
 using MultiSourceContentDelivery.Models;
 using System.Net.Http.Json;
+using System.Net.NetworkInformation;
+using System.Net;
 using Polly;
 using Polly.Retry;
 using FileInfo = MultiSourceContentDelivery.Models.FileInfo;
@@ -165,16 +167,17 @@ public class DirectoryScanService : BackgroundService
                             ContentType = GetContentType(file),
                             Size = new IOFileInfo(file).Length,
                             LocalPath = relPath,
-                            AvailableNodes = new List<string> { $"http://{Environment.MachineName}" }
+                            AvailableNodes = new List<string> { GetNodeUrl() }
                         };
                         await context.FileInfos.AddAsync(fileInfo);
                     }
                     else
                     {
                         fileInfo.LocalPath = relPath;
-                        if (!fileInfo.AvailableNodes.Contains($"http://{Environment.MachineName}"))
+                        var nodeUrl = GetNodeUrl();
+                        if (!fileInfo.AvailableNodes.Contains(nodeUrl))
                         {
-                            fileInfo.AvailableNodes.Add($"http://{Environment.MachineName}");
+                            fileInfo.AvailableNodes.Add(nodeUrl);
                         }
                     }
                 }
@@ -206,7 +209,7 @@ public class DirectoryScanService : BackgroundService
             // 更新本节点信息
             var nodeInfo = new NodeInfo
             {
-                Url = $"http://{Environment.MachineName}",
+                Url = GetNodeUrl(),
                 AvailableStorageBytes = await GetAvailableStorageAsync(),
                 CurrentLoad = await GetCurrentLoadAsync(),
                 LastSeen = DateTime.UtcNow
@@ -351,5 +354,28 @@ public class DirectoryScanService : BackgroundService
             ".txt" => "text/plain",
             _ => "application/octet-stream"
         };
+    }
+
+    private string GetNodeUrl()
+    {
+        try
+        {
+            // 获取本机所有网络接口的IP地址
+            var ipAddress = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
+                .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+                .Where(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
+                    && !System.Net.IPAddress.IsLoopback(a.Address))
+                .Select(a => a.Address.ToString())
+                .FirstOrDefault();
+
+            // 如果找不到合适的IP地址，使用localhost
+            return $"http://{ipAddress ?? "localhost"}";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting node URL, falling back to localhost");
+            return $"http://localhost";
+        }
     }
 }

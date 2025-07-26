@@ -167,17 +167,17 @@ public class DirectoryScanService : BackgroundService
                             ContentType = GetContentType(file),
                             Size = new IOFileInfo(file).Length,
                             LocalPath = relPath,
-                            AvailableNodes = new List<string> { GetNodeUrl() }
+                            AvailableNodes = new List<string> { GetNodeIp() }
                         };
                         await context.FileInfos.AddAsync(fileInfo);
                     }
                     else
                     {
                         fileInfo.LocalPath = relPath;
-                        var nodeUrl = GetNodeUrl();
-                        if (!fileInfo.AvailableNodes.Contains(nodeUrl))
+                        var nodeIp = GetNodeIp();
+                        if (!fileInfo.AvailableNodes.Contains(nodeIp))
                         {
-                            fileInfo.AvailableNodes.Add(nodeUrl);
+                            fileInfo.AvailableNodes.Add(nodeIp);
                         }
                     }
                 }
@@ -209,7 +209,7 @@ public class DirectoryScanService : BackgroundService
             // 更新本节点信息
             var nodeInfo = new NodeInfo
             {
-                Url = GetNodeUrl(),
+                Url = GetNodeIp(), // 保存IP而不是完整URL
                 AvailableStorageBytes = await GetAvailableStorageAsync(),
                 CurrentLoad = await GetCurrentLoadAsync(),
                 LastSeen = DateTime.UtcNow
@@ -241,8 +241,12 @@ public class DirectoryScanService : BackgroundService
             {
                 try
                 {
+                    var request = new HttpRequestMessage(HttpMethod.Get, $"https://{_config.MainDomain}/api/node/files");
+                    // 设置 Host 头以便 Nginx 将请求路由到正确的节点
+                    request.Headers.Host = $"{node.Url}.{_config.MainDomain}";
+                    
                     var response = await _retryPolicy.ExecuteAsync(async () =>
-                        await client.GetAsync($"{node.Url}/api/node/files", stoppingToken));
+                        await client.SendAsync(request, stoppingToken));
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -359,7 +363,7 @@ public class DirectoryScanService : BackgroundService
         };
     }
 
-    private string GetNodeUrl()
+    private string GetNodeIp()
     {
         try
         {
@@ -372,13 +376,12 @@ public class DirectoryScanService : BackgroundService
                 .Select(a => a.Address.ToString())
                 .FirstOrDefault();
 
-            // 如果找不到合适的IP地址，使用localhost
-            return $"http://{ipAddress ?? "localhost"}";
+            return ipAddress ?? "127.0.0.1";
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting node URL, falling back to localhost");
-            return $"http://localhost";
+            _logger.LogError(ex, "Error getting node IP, falling back to localhost");
+            return "127.0.0.1";
         }
     }
 }

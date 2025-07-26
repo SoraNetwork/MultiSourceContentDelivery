@@ -4,6 +4,8 @@ using MultiSourceContentDelivery.DbContexts;
 using MultiSourceContentDelivery.Models;
 using MultiSourceContentDelivery.Services;
 using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 
 namespace MultiSourceContentDelivery.Controllers;
 
@@ -41,8 +43,6 @@ public class StatusController : ControllerBase
             // 获取DNS解析状态
             var nodeAddresses = await _dnsService.GetNodeAddresses();
             var hostName = Dns.GetHostName();
-            var localIps = await Dns.GetHostAddressesAsync(hostName);
-            var localIpList = localIps.Select(ip => ip.ToString()).ToList();
 
             // 获取存储状态
             var availableStorage = await _storageService.GetAvailableStorageAsync();
@@ -60,26 +60,26 @@ public class StatusController : ControllerBase
                 .FirstOrDefaultAsync() ?? new { TotalFiles = 0, TotalSize = 0L, LocalFiles = 0 };
 
             // 获取连接的节点，去除自己
-            var selfAddresses = new HashSet<string>(localIpList.Concat(new[] { hostName }), StringComparer.OrdinalIgnoreCase);
             var connectedNodes = await _context.Nodes
                 .Where(n => n.LastSeen > DateTime.UtcNow.AddMinutes(-15))
-                .Where(n => !selfAddresses.Contains(n.Url) && n.Url != hostName) // 排除自己
+                .Where(n => n.Url != GetNodeIp()) // 排除自己
                 .Select(n => new ConnectedNode
                 {
-                    Url = $"http://{_config.MainDomain}",
+                    Url = $"https://{_config.MainDomain}",
                     LastSeen = n.LastSeen,
                     CurrentLoad = n.CurrentLoad,
                     AvailableStorageBytes = n.AvailableStorageBytes
                 })
                 .ToListAsync();
 
+            var nodeIp = GetNodeIp();
             var status = new NodeStatus
             {
                 Hostname = hostName,
                 MainDomain = _config.MainDomain,
-                LocalAddresses = localIpList,
+                LocalAddresses = new List<string> { nodeIp },
                 ResolvedAddresses = nodeAddresses,
-                IsPartOfCluster = nodeAddresses.Intersect(localIpList).Any(),
+                IsPartOfCluster = nodeAddresses.Contains(nodeIp),
                 StorageStatus = new StorageStatus
                 {
                     AvailableStorageBytes = availableStorage,
@@ -109,6 +109,25 @@ public class StatusController : ControllerBase
     public ActionResult<List<NodeStatusHistory>> GetHistory()
     {
         return _statusHistory;
+    }
+
+    private string GetNodeIp()
+    {
+        try
+        {
+            return NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n => n.OperationalStatus == OperationalStatus.Up)
+                .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+                .Where(a => a.Address.AddressFamily == AddressFamily.InterNetwork
+                    && !IPAddress.IsLoopback(a.Address))
+                .Select(a => a.Address.ToString())
+                .FirstOrDefault() ?? "127.0.0.1";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting node IP, falling back to localhost");
+            return "127.0.0.1";
+        }
     }
 
     private void UpdateStatusHistory(NodeStatus currentStatus)

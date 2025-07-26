@@ -54,13 +54,13 @@ jobs:
       run: |
         find ./deploy-package -name "appsettings*.json" -delete
         
-#    - name: Stop remote service
-#      uses: appleboy/ssh-action@v1
-#      with: 
-#        host: ${{ secrets[format('{0}_SERVER', matrix.location)] }}
-#        username: ${{ secrets[format('{0}_USERNAME', matrix.location)] }}
-#        password: ${{ secrets[format('{0}_KEY', matrix.location)] }}
-#        script: sudo supervisorctl stop multisourcecontentdelivery-service
+    - name: Stop remote service
+      uses: appleboy/ssh-action@v1
+      with: 
+        host: ${{ secrets[format('{0}_SERVER', matrix.location)] }}
+        username: ${{ secrets[format('{0}_USERNAME', matrix.location)] }}
+        password: ${{ secrets[format('{0}_KEY', matrix.location)] }}
+        script: sudo supervisorctl stop mcdn-service
           
     - name: Deploy via SFTP
       uses: wlixcc/SFTP-Deploy-Action@v1.2.5
@@ -71,10 +71,10 @@ jobs:
         local_path: './deploy-package/*'
         remote_path: '/www/mcdn'
         
-#    - name: Start remote service
-#      uses: appleboy/ssh-action@v1
-#      with: 
-#        host: ${{ secrets[format('{0}_SERVER', matrix.location)] }}
-#        password: ${{ secrets[format('{0}_USERNAME', matrix.location)] }}
-#        key: ${{ secrets[format('{0}_KEY', matrix.location)] }}
-#        script: sudo supervisorctl start multisourcecontentdelivery-service
+    - name: Start remote service
+      uses: appleboy/ssh-action@v1
+      with: 
+        host: ${{ secrets[format('{0}_SERVER', matrix.location)] }}
+        password: ${{ secrets[format('{0}_USERNAME', matrix.location)] }}
+        key: ${{ secrets[format('{0}_KEY', matrix.location)] }}
+        script: sudo supervisorctl start mcdn-service

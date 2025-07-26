@@ -13,7 +13,7 @@ namespace MultiSourceContentDelivery
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
-
+            builder.WebHost.UseUrls("http://*:5010");
             // Add configuration
             builder.Services.Configure<NodeConfig>(
                 builder.Configuration.GetSection("NodeConfig"));
